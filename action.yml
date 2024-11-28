@@ -1,0 +1,42 @@
+name: 'Git Checkout'
+description: 'Checkout repository without using actions/checkout'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Clean Workspace
+      shell: bash
+      run: |
+        # Clean workspace safely
+        find . -mindepth 1 -delete || true
+
+    - name: Initialize Git and Configure
+      shell: bash
+      run: |
+        git init
+        git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+
+    - name: Setup Authentication and Remote
+      shell: bash
+      run: |
+        git remote add origin "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+    - name: Fetch and Checkout
+      shell: bash
+      run: |
+        # Determine ref to fetch based on event type
+        if [[ "$GITHUB_EVENT_NAME" == "pull_request" || "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+          REF="${GITHUB_REF/refs\/pull\/}"
+          PR_NUM="${REF/\/merge/}"
+          git fetch --no-tags --progress --no-recurse-submodules --depth=1 origin "pull/${PR_NUM}/head:pr/${PR_NUM}"
+          git checkout "pr/${PR_NUM}"
+        elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          git fetch --no-tags --progress --no-recurse-submodules --depth=1 origin "$GITHUB_REF:$GITHUB_REF"
+          git checkout "$GITHUB_REF"
+        else
+          git fetch --no-tags --progress --no-recurse-submodules --depth=1 origin "${GITHUB_REF}:${GITHUB_REF}"
+          git checkout "${GITHUB_REF#refs/heads/}"
+        fi
+        chmod -R u+w .
